@@ -1,7 +1,4 @@
-﻿using System.Diagnostics;
-using System.Threading;
-
-namespace PhotoManagement
+﻿namespace PhotoManagement
 {
     public partial class MoveFiles : Form
     {
@@ -22,7 +19,7 @@ namespace PhotoManagement
             BindGrid(folderPath, sourceGrid, grpSource);
         }
 
-       
+
 
         private void BtnSelectFolderTarget_Click(object sender, EventArgs e)
         {
@@ -51,42 +48,34 @@ namespace PhotoManagement
                     int i = 0;
                     var failedFiles = new List<string>();
 
-                    Parallel.ForEach(filteredList, new ParallelOptions() { MaxDegreeOfParallelism = 10 }, file =>
+                    foreach (var file in filteredList)
                     {
                         string targetPath = Path.Combine(txtTargetFolder.Text, file.FileName);
                         try
                         {
-                            if (File.Exists(targetPath))
-                            {
-                                // Optionally skip or log existing files
-                                // failedFiles.Add($"Skipped (exists): {file.FileName}");
-                                return;
-                            }
-                            File.Copy(file.Path, targetPath, false); // Do not overwrite
+                            File.Move(file.Path, targetPath, false); // Do not overwrite
                         }
                         catch (Exception ex)
                         {
-                            lock (failedFiles)
-                            {
-                                failedFiles.Add($"{file.FileName}: {ex.Message}");
-                            }
+                            failedFiles.Add($"{file.FileName}: {ex.Message}");
                         }
-                        int current = Interlocked.Increment(ref i);
-                        if (current % 5 == 0 || current == filteredList.Count) // Update UI every 5 files or at the end
+                        i++;
+
+                        if (i % 5 == 0 || i == filteredList.Count) // Update UI every 5 files or at the end
                         {
                             this.Invoke(() =>
                             {
                                 lblFileName.Text = $"Moving File: {file.FileName}";
-                                lblPercentage.Text = $"{((current * 100.0) / filteredList.Count):0.00}%";
-                                progressBar1.Value = current;
+                                lblPercentage.Text = $"{((i * 100.0) / filteredList.Count):0.00}%";
+                                progressBar1.Value = i;
                             });
                         }
-                    });
+                    }
+
                     return failedFiles;
                 })
                 .ContinueWith(t =>
                 {
-                  
                     if (t.IsFaulted)
                     {
                         MessageBox.Show("An error occurred while moving files: " + t.Exception?.Message);
@@ -97,9 +86,16 @@ namespace PhotoManagement
                     }
                     else
                     {
+                        BindGrid(txtTargetFolder.Text, targetGrid, grpTarget);
+                        BindGrid(txtSourceFolder.Text, sourceGrid, grpSource);
+                      
                         MessageBox.Show($"Files moved successfully!");
+                        progressBar1.Value = 0;
+                        lblFileName.Text = string.Empty;
+                        lblPercentage.Text = string.Empty;
                     }
                 }, TaskScheduler.FromCurrentSynchronizationContext());
+
             }
         }
 
